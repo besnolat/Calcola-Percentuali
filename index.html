@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Calcolatrici">
+<link rel="manifest" href="manifest.json">
+<title>Calcolatrici</title>
+<style>
+:root {
+  --blue: #007AFF;
+  --bg: #F2F2F7;
+  --card: #fff;
+  --label: #000;
+  --gray: #8E8E93;
+  --gray2: #C7C7CC;
+  --sep: rgba(60,60,67,.2);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --tabbar-h: calc(49px + var(--safe-bottom));
+}
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html,body { height: 100%; background: var(--bg);
+  font-family: -apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;
+  color: var(--label); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
+
+#app { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+
+#screen-container { flex: 1; position: relative; overflow: hidden; }
+
+/* ── Tab screens (instant switch) ── */
+.ts {
+  position: absolute; inset: 0;
+  display: none; flex-direction: column;
+  background: var(--bg);
+}
+.ts.active { display: flex; }
+.ts.behind {
+  transform: translateX(-28%);
+  transition: transform .32s cubic-bezier(.4,0,.2,1);
+  pointer-events: none;
+}
+.ts.active.returning {
+  transform: translateX(0);
+  transition: transform .32s cubic-bezier(.4,0,.2,1);
+}
+
+/* ── Push screen (animated) ── */
+.ps {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  transform: translateX(100%);
+  transition: transform .32s cubic-bezier(.4,0,.2,1);
+  will-change: transform;
+}
+.ps.active { transform: translateX(0); }
+
+/* ── Large nav ── */
+.large-nav {
+  padding-top: var(--safe-top);
+  background: rgba(242,242,247,.88);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  border-bottom: .5px solid var(--sep);
+  flex-shrink: 0;
+}
+.large-nav-row {
+  height: 52px; display: flex; align-items: flex-end;
+  justify-content: space-between; padding: 0 16px 8px;
+}
+.large-title { font-size: 34px; font-weight: 700; letter-spacing: -.5px; }
+
+.storia-btn {
+  background: rgba(0,122,255,.12); color: var(--blue);
+  border: none; border-radius: 8px;
+  padding: 6px 12px; font-size: 15px; font-weight: 500;
+  font-family: inherit; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.storia-btn.on { background: var(--blue); color: #fff; }
+
+/* ── Detail nav ── */
+.nav-bar {
+  padding-top: var(--safe-top);
+  background: rgba(242,242,247,.88);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  border-bottom: .5px solid var(--sep); flex-shrink: 0;
+}
+.nav-row {
+  height: 44px; display: flex; align-items: center; padding: 0 4px;
+}
+.nav-title {
+  flex: 1; text-align: center; font-size: 17px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 4px;
+}
+.nav-btn {
+  background: none; border: none; color: var(--blue);
+  font-size: 17px; font-family: inherit;
+  padding: 6px 10px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  display: flex; align-items: center; gap: 1px;
+  min-width: 72px;
+}
+.nav-btn.right { justify-content: flex-end; font-size: 20px; }
+.nav-btn.left { justify-content: flex-start; }
+.chevron { font-size: 28px; line-height: 1; margin-top: -2px; }
+
+/* ── Content ── */
+.content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── List ── */
+.section-list { padding: 20px 0 8px; }
+.sect-header {
+  font-size: 13px; color: var(--gray);
+  padding: 0 32px 5px; letter-spacing: .3px;
+}
+.card-list {
+  background: var(--card); border-radius: 12px;
+  margin: 0 16px 24px; overflow: hidden;
+}
+.row {
+  display: flex; align-items: center;
+  padding: 11px 14px; gap: 12px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; position: relative;
+}
+.row + .row::before {
+  content: ''; position: absolute; top: 0; left: 58px; right: 0;
+  height: .5px; background: var(--sep);
+}
+.row:active { background: rgba(0,0,0,.05); }
+.icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 14px; color: #fff; flex-shrink: 0;
+}
+.row-label { flex: 1; font-size: 16px; }
+.row-chevron { color: var(--gray2); font-size: 14px; font-weight: 600; }
+
+/* ── Calc form ── */
+.calc-body { padding: 20px 16px 48px; }
+.form-card { background: var(--card); border-radius: 14px; padding: 16px; }
+.form-label {
+  text-align: center; font-size: 15px; color: var(--gray);
+  padding: 5px 0 3px;
+}
+.input-wrap { position: relative; margin: 4px 0; }
+.form-input {
+  display: block; width: 100%; height: 46px;
+  border: 1px solid #D1D1D6; border-radius: 10px;
+  padding: 0 38px 0 14px;
+  font-size: 18px; font-family: inherit;
+  background: var(--bg); color: var(--label);
+  outline: none; -webkit-appearance: none;
+  transition: border-color .15s, background .15s;
+}
+.form-input.no-suffix { padding-right: 14px; }
+.form-input:focus { border-color: var(--blue); background: #fff; }
+.input-unit {
+  position: absolute; right: 12px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 17px; color: var(--gray); pointer-events: none;
+}
+.q-mark { text-align: center; font-size: 20px; color: var(--gray2); padding: 8px 0; }
+.calc-btn {
+  width: 100%; height: 46px;
+  background: var(--blue); color: #fff;
+  border: none; border-radius: 12px;
+  font-size: 17px; font-weight: 600; font-family: inherit;
+  margin-top: 8px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity .1s;
+}
+.calc-btn:active { opacity: .8; }
+.result-box {
+  margin-top: 10px;
+  border: 2px solid var(--blue); border-radius: 12px;
+  height: 52px; display: flex; align-items: center; justify-content: center;
+  font-size: 24px; font-weight: 700; color: var(--blue);
+  transition: border-color .2s, color .2s;
+}
+.result-box.empty { border-color: #D1D1D6; color: #D1D1D6; }
+.result-box.error { border-color: #FF3B30; color: #FF3B30; }
+.action-row { display: flex; gap: 10px; margin-top: 10px; }
+.act-btn {
+  flex: 1; height: 38px; border: none; border-radius: 10px;
+  font-size: 15px; font-weight: 500; font-family: inherit;
+  background: rgba(0,122,255,.12); color: var(--blue);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: opacity .1s;
+}
+.act-btn:active { opacity: .7; }
+
+/* ── Storia ── */
+.storia-list { padding: 20px 0; }
+.storia-entry {
+  background: var(--card); border-radius: 12px;
+  margin: 0 16px 10px; padding: 12px 14px;
+}
+.st-name { font-size: 12px; color: var(--gray); margin-bottom: 3px; }
+.st-formula { font-size: 15px; margin-bottom: 2px; }
+.st-result { font-size: 22px; font-weight: 700; color: var(--blue); }
+.st-time { font-size: 11px; color: var(--gray); margin-top: 3px; }
+.storia-empty {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 80px 20px; gap: 12px; color: var(--gray);
+}
+.storia-empty-icon { font-size: 48px; }
+
+.storia-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 16px 0;
+}
+.clear-storia-btn {
+  background: none; border: none; color: #FF3B30;
+  font-size: 14px; font-family: inherit;
+  padding: 4px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Tab bar ── */
+#tab-bar {
+  height: var(--tabbar-h);
+  padding-bottom: var(--safe-bottom);
+  background: rgba(248,248,248,.94);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  border-top: .5px solid var(--sep);
+  display: flex; flex-shrink: 0; z-index: 100;
+}
+.tab {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 2px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; padding-top: 4px;
+}
+.tab-ic { font-size: 23px; color: var(--gray); line-height: 1; }
+.tab-lbl { font-size: 10px; color: var(--gray); }
+.tab.active .tab-ic,
+.tab.active .tab-lbl { color: var(--blue); }
+
+/* ── Toast ── */
+#toast {
+  position: fixed; bottom: calc(var(--tabbar-h) + 12px);
+  left: 50%; transform: translateX(-50%) translateY(8px);
+  background: rgba(0,0,0,.72); color: #fff;
+  padding: 9px 18px; border-radius: 20px;
+  font-size: 14px; opacity: 0;
+  transition: opacity .25s, transform .25s;
+  pointer-events: none; z-index: 300; white-space: nowrap;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Placeholder screens ── */
+.placeholder {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  height: 100%; gap: 10px; color: var(--gray);
+}
+.placeholder-icon { font-size: 54px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="screen-container">
+
+    <!-- TAB: Calcolatrici -->
+    <div class="ts active" id="ts-calcolatrici">
+      <div class="large-nav">
+        <div class="large-nav-row">
+          <span class="large-title">Calcolatrici</span>
+          <button class="storia-btn" id="storia-btn" onclick="toggleStoria()">Storia</button>
+        </div>
+      </div>
+      <div class="content" id="home-content"></div>
+    </div>
+
+    <!-- PUSH: Calc detail -->
+    <div class="ps" id="ps-calc">
+      <div class="nav-bar">
+        <div class="nav-row">
+          <button class="nav-btn left" onclick="goBack()">
+            <span class="chevron">‹</span>Indietro
+          </button>
+          <span class="nav-title" id="calc-nav-title"></span>
+          <button class="nav-btn right" onclick="resetCalc()" title="Azzera">↺</button>
+        </div>
+      </div>
+      <div class="content">
+        <div class="calc-body" id="calc-body"></div>
+      </div>
+    </div>
+
+    <!-- TAB: Comune -->
+    <div class="ts" id="ts-comune">
+      <div class="large-nav">
+        <div class="large-nav-row"><span class="large-title">Comune</span></div>
+      </div>
+      <div class="content">
+        <div class="placeholder">
+          <div class="placeholder-icon">🔧</div>
+          <p>Prossimamente</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Info -->
+    <div class="ts" id="ts-info">
+      <div class="large-nav">
+        <div class="large-nav-row"><span class="large-title">Info</span></div>
+      </div>
+      <div class="content">
+        <div class="placeholder">
+          <div class="placeholder-icon" style="font-size:60px;font-weight:700;color:var(--blue)">%</div>
+          <p style="font-weight:700;font-size:20px;color:var(--label)">Calcolatrici</p>
+          <p style="font-size:14px">Versione 1.0</p>
+          <p style="font-size:13px;margin-top:8px;text-align:center;padding:0 32px">
+            App per calcolare percentuali in tutte le varianti.</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /screen-container -->
+
+  <!-- TAB BAR -->
+  <div id="tab-bar">
+    <div class="tab active" id="tab-calcolatrici" onclick="switchTab('calcolatrici')">
+      <div class="tab-ic">⊞</div>
+      <div class="tab-lbl">Calcolatrici</div>
+    </div>
+    <div class="tab" id="tab-comune" onclick="switchTab('comune')">
+      <div class="tab-ic">▭</div>
+      <div class="tab-lbl">Comune</div>
+    </div>
+    <div class="tab" id="tab-info" onclick="switchTab('info')">
+      <div class="tab-ic">ⓘ</div>
+      <div class="tab-lbl">Info</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Dati calcolatori ──────────────────────────
+const CALCS = [
+  // ── Sezione 0: Y = P% × X ──
+  {
+    id:'pct-of-x', section:0,
+    title:'Qual è il P% di X?',
+    iconBg:'#FFD60A', iconFg:'#000', iconLetter:'Y',
+    rows:[
+      {t:'label', text:'Qual è il'},
+      {t:'input', key:'p', suffix:'%'},
+      {t:'label', text:'di'},
+      {t:'input', key:'x'},
+    ],
+    resSuffix:'',
+    calc: v => v.x * v.p / 100,
+    formula: (v,r) => `${fmtN(v.p)}% di ${fmtN(v.x)} = ${r}`
+  },
+  {
+    id:'y-pct-of-x', section:0,
+    title:'Y è quale percentuale (%) di X?',
+    iconBg:'#007AFF', iconFg:'#fff', iconLetter:'P',
+    rows:[
+      {t:'input', key:'y'},
+      {t:'label', text:'è quale percentuale (%) di'},
+      {t:'input', key:'x'},
+    ],
+    resSuffix:'%',
+    calc: v => v.y / v.x * 100,
+    formula: (v,r) => `${fmtN(v.y)} / ${fmtN(v.x)} = ${r}%`
+  },
+  {
+    id:'y-is-pct-of', section:0,
+    title:'Y è P% di Quale numero?',
+    iconBg:'#1C3A6E', iconFg:'#fff', iconLetter:'X',
+    rows:[
+      {t:'input', key:'y'},
+      {t:'label', text:'è'},
+      {t:'input', key:'p', suffix:'%'},
+      {t:'label', text:'di quale numero?'},
+    ],
+    resSuffix:'',
+    calc: v => v.y * 100 / v.p,
+    formula: (v,r) => `${fmtN(v.y)} è ${fmtN(v.p)}% di ${r}`
+  },
+  // ── Sezione 1: Aumento ──
+  {
+    id:'inc-result', section:1,
+    title:'X aumentato P%, qual è il risultato?',
+    iconBg:'#FF9500', iconFg:'#fff', iconLetter:'Y',
+    rows:[
+      {t:'input', key:'x'},
+      {t:'label', text:'aumentato di'},
+      {t:'input', key:'p', suffix:'%'},
+      {t:'label', text:'qual è il risultato?'},
+    ],
+    resSuffix:'',
+    calc: v => v.x * (1 + v.p / 100),
+    formula: (v,r) => `${fmtN(v.x)} + ${fmtN(v.p)}% = ${r}`
+  },
+  {
+    id:'inc-pct', section:1,
+    title:'X aumentato Qual % è Y?',
+    iconBg:'#FF9500', iconFg:'#fff', iconLetter:'P',
+    rows:[
+      {t:'input', key:'x'},
+      {t:'label', text:'aumentato di qual % è'},
+      {t:'input', key:'y'},
+    ],
+    resSuffix:'%',
+    calc: v => (v.y / v.x - 1) * 100,
+    formula: (v,r) => `${fmtN(v.x)} → ${fmtN(v.y)}: +${r}%`
+  },
+  {
+    id:'inc-base', section:1,
+    title:'Quale numero aumentato P% è Y?',
+    iconBg:'#FF9500', iconFg:'#fff', iconLetter:'X',
+    rows:[
+      {t:'label', text:'Quale numero aumentato di'},
+      {t:'input', key:'p', suffix:'%'},
+      {t:'label', text:'dà'},
+      {t:'input', key:'y'},
+    ],
+    resSuffix:'',
+    calc: v => v.y / (1 + v.p / 100),
+    formula: (v,r) => `${r} + ${fmtN(v.p)}% = ${fmtN(v.y)}`
+  },
+  // ── Sezione 2: Diminuzione ──
+  {
+    id:'dec-result', section:2,
+    title:'X diminuito P%, qual è il risultato?',
+    iconBg:'#34C759', iconFg:'#fff', iconLetter:'Y',
+    rows:[
+      {t:'input', key:'x'},
+      {t:'label', text:'diminuito di'},
+      {t:'input', key:'p', suffix:'%'},
+      {t:'label', text:'qual è il risultato?'},
+    ],
+    resSuffix:'',
+    calc: v => v.x * (1 - v.p / 100),
+    formula: (v,r) => `${fmtN(v.x)} − ${fmtN(v.p)}% = ${r}`
+  },
+  {
+    id:'dec-pct', section:2,
+    title:'X diminuito Qual % è Y?',
+    iconBg:'#34C759', iconFg:'#fff', iconLetter:'P',
+    rows:[
+      {t:'input', key:'x'},
+      {t:'label', text:'diminuito di qual % è'},
+      {t:'input', key:'y'},
+    ],
+    resSuffix:'%',
+    calc: v => (1 - v.y / v.x) * 100,
+    formula: (v,r) => `${fmtN(v.x)} → ${fmtN(v.y)}: −${r}%`
+  },
+  {
+    id:'dec-base', section:2,
+    title:'Quale numero diminuito P% è Y?',
+    iconBg:'#34C759', iconFg:'#fff', iconLetter:'X',
+    rows:[
+      {t:'label', text:'Quale numero diminuito di'},
+      {t:'input', key:'p', suffix:'%'},
+      {t:'label', text:'dà'},
+      {t:'input', key:'y'},
+    ],
+    resSuffix:'',
+    calc: v => v.y / (1 - v.p / 100),
+    formula: (v,r) => `${r} − ${fmtN(v.p)}% = ${fmtN(v.y)}`
+  },
+];
+
+const SECTIONS = [
+  { label: 'Y = P% × X',         ids: [0,1,2] },
+  { label: 'X + (X × P%) = Y',   ids: [3,4,5] },
+  { label: 'X − (X × P%) = Y',   ids: [6,7,8] },
+];
+
+// ── Stato ─────────────────────────────────────
+let currentTab = 'calcolatrici';
+let currentCalcId = null;
+let showingStoria = false;
+let storia = JSON.parse(localStorage.getItem('pct_storia') || '[]');
+let lastResult = null;
+
+// ── Numeri ────────────────────────────────────
+function parseNum(s) {
+  if (!s || !s.trim()) return NaN;
+  let c = s.trim().replace(/\s/g,'');
+  const lc = c.lastIndexOf(',');
+  const ld = c.lastIndexOf('.');
+  if (lc > ld) {
+    c = c.replace(/\./g,'').replace(',','.');
+  } else {
+    c = c.replace(/,/g,'');
+  }
+  return parseFloat(c);
+}
+
+function fmtN(n) {
+  if (!isFinite(n) || isNaN(n)) return '?';
+  return parseFloat(n.toPrecision(12)).toLocaleString('it-IT', {maximumFractionDigits:8});
+}
+
+function fmtResult(n, suffix) {
+  if (isNaN(n) || !isFinite(n)) return null;
+  return fmtN(n) + suffix;
+}
+
+// ── Render Home ───────────────────────────────
+function renderHome() {
+  const el = document.getElementById('home-content');
+  if (showingStoria) {
+    el.innerHTML = buildStoriaHTML();
+  } else {
+    let h = '<div class="section-list">';
+    for (const sect of SECTIONS) {
+      h += `<div class="sect-header">${sect.label}</div><div class="card-list">`;
+      for (const idx of sect.ids) {
+        const c = CALCS[idx];
+        h += `<div class="row" onclick="openCalc('${c.id}')">
+          <div class="icon" style="background:${c.iconBg};color:${c.iconFg}">${c.iconLetter}</div>
+          <div class="row-label">${c.title}</div>
+          <div class="row-chevron">›</div>
+        </div>`;
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+    el.innerHTML = h;
+  }
+}
+
+// ── Storia ────────────────────────────────────
+function buildStoriaHTML() {
+  if (!storia.length) {
+    return `<div class="storia-empty">
+      <div class="storia-empty-icon">📋</div>
+      <p>Nessun calcolo salvato</p>
+    </div>`;
+  }
+  let h = `<div class="storia-header">
+    <span style="font-size:13px;color:var(--gray)">${storia.length} calcol${storia.length===1?'o':'i'}</span>
+    <button class="clear-storia-btn" onclick="clearStoria()">Cancella tutto</button>
+  </div><div class="storia-list">`;
+  for (let i = storia.length - 1; i >= 0; i--) {
+    const e = storia[i];
+    h += `<div class="storia-entry">
+      <div class="st-name">${e.calcTitle}</div>
+      <div class="st-formula">${e.formula}</div>
+      <div class="st-result">${e.result}</div>
+      <div class="st-time">${e.time}</div>
+    </div>`;
+  }
+  h += '</div>';
+  return h;
+}
+
+function clearStoria() {
+  if (!confirm('Cancellare tutta la storia?')) return;
+  storia = [];
+  localStorage.removeItem('pct_storia');
+  renderHome();
+}
+
+// ── Render Calc ───────────────────────────────
+function renderCalc(calcId) {
+  const c = CALCS.find(x => x.id === calcId);
+  if (!c) return;
+  document.getElementById('calc-nav-title').textContent = c.title;
+
+  let h = '<div class="form-card">';
+  for (const row of c.rows) {
+    if (row.t === 'label') {
+      h += `<div class="form-label">${row.text}</div>`;
+    } else {
+      const hasSuf = !!row.suffix;
+      h += `<div class="input-wrap">
+        <input class="form-input${hasSuf?'':' no-suffix'}"
+               type="text" inputmode="decimal"
+               id="inp-${row.key}" placeholder="0"
+               autocomplete="off" autocorrect="off"
+               oninput="onInputChange()" onkeydown="onKeyDown(event)">
+        ${hasSuf ? `<span class="input-unit">${row.suffix}</span>` : ''}
+      </div>`;
+    }
+  }
+  h += `<div class="q-mark">?</div>
+    <button class="calc-btn" onclick="doCalc()">Calcola</button>
+    <div class="result-box empty" id="result-box">0</div>
+    <div class="action-row">
+      <button class="act-btn" onclick="doSalva()">Salva</button>
+      <button class="act-btn" onclick="doCopia()">Copia</button>
+    </div>
+  </div>`;
+  document.getElementById('calc-body').innerHTML = h;
+  lastResult = null;
+}
+
+// ── Calcolo ───────────────────────────────────
+function getVals() {
+  const vals = {};
+  document.querySelectorAll('#calc-body .form-input').forEach(inp => {
+    vals[inp.id.replace('inp-','')] = parseNum(inp.value);
+  });
+  return vals;
+}
+
+function onInputChange() {
+  const vals = getVals();
+  if (Object.values(vals).every(v => !isNaN(v))) doCalc(true);
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Enter') { e.preventDefault(); doCalc(); }
+}
+
+function doCalc(silent = false) {
+  const c = CALCS.find(x => x.id === currentCalcId);
+  if (!c) return;
+  const vals = getVals();
+  if (Object.values(vals).some(v => isNaN(v))) {
+    if (!silent) showToast('Inserisci tutti i valori');
+    return;
+  }
+  const n = c.calc(vals);
+  const box = document.getElementById('result-box');
+  const formatted = fmtResult(n, c.resSuffix);
+  if (formatted === null) {
+    box.textContent = 'Errore';
+    box.className = 'result-box error';
+    lastResult = null;
+  } else {
+    box.textContent = formatted;
+    box.className = 'result-box';
+    lastResult = { n, formatted, vals, calcId: currentCalcId };
+  }
+}
+
+function resetCalc() {
+  document.querySelectorAll('#calc-body .form-input').forEach(i => i.value = '');
+  const box = document.getElementById('result-box');
+  if (box) { box.textContent = '0'; box.className = 'result-box empty'; }
+  lastResult = null;
+  const first = document.querySelector('#calc-body .form-input');
+  if (first) first.focus();
+}
+
+// ── Salva / Copia ─────────────────────────────
+function doSalva() {
+  if (!lastResult) { showToast('Prima calcola un risultato'); return; }
+  const c = CALCS.find(x => x.id === lastResult.calcId);
+  storia.push({
+    calcTitle: c.title,
+    formula: c.formula(lastResult.vals, lastResult.formatted),
+    result: lastResult.formatted,
+    time: new Date().toLocaleString('it-IT',
+      {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+  });
+  localStorage.setItem('pct_storia', JSON.stringify(storia));
+  showToast('Salvato ✓');
+}
+
+function doCopia() {
+  if (!lastResult) { showToast('Prima calcola un risultato'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(lastResult.formatted)
+      .then(() => showToast('Copiato ✓'))
+      .catch(() => showToast(lastResult.formatted));
+  } else {
+    showToast(lastResult.formatted);
+  }
+}
+
+// ── Navigazione ───────────────────────────────
+function openCalc(id) {
+  currentCalcId = id;
+  renderCalc(id);
+  const home = document.getElementById('ts-calcolatrici');
+  const calc = document.getElementById('ps-calc');
+  home.classList.add('behind');
+  calc.classList.add('active');
+  setTimeout(() => {
+    const first = calc.querySelector('.form-input');
+    if (first) first.focus();
+  }, 340);
+}
+
+function goBack() {
+  const home = document.getElementById('ts-calcolatrici');
+  const calc = document.getElementById('ps-calc');
+  calc.classList.remove('active');
+  home.classList.remove('behind');
+  currentCalcId = null;
+}
+
+function toggleStoria() {
+  showingStoria = !showingStoria;
+  const btn = document.getElementById('storia-btn');
+  btn.classList.toggle('on', showingStoria);
+  btn.textContent = showingStoria ? 'Calcolatrici' : 'Storia';
+  renderHome();
+}
+
+function switchTab(tab) {
+  if (tab === currentTab) return;
+  if (currentCalcId) goBack();
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  document.querySelectorAll('.ts').forEach(s => s.classList.remove('active'));
+  document.getElementById(`ts-${tab}`).classList.add('active');
+  currentTab = tab;
+}
+
+// ── Toast ─────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ── Init ──────────────────────────────────────
+renderHome();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
